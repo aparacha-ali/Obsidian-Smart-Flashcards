@@ -1,0 +1,9 @@
+{
+  "id": "smart-flashcards",
+  "name": "Smart Flashcards",
+  "version": "1.0.0",
+  "minAppVersion": "1.2.8",
+  "description": "Spaced repetition flashcards with inline syntax, sidebar panel, and note-level review scheduling.",
+  "author": "ali",
+  "isDesktopOnly": false
+}

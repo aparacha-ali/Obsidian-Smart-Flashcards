@@ -1,0 +1,501 @@
+/* Smart Flashcards Plugin Styles */
+
+/* ── Hover preview z-index fix ─────────────────── */
+/* While the review modal is open, ensure the hover popover floats above it */
+body.sfc-review-open .popover {
+  z-index: 10000 !important;
+}
+
+/* ── Inline cards (reading mode) ───────────────── */
+
+/* Always hide the bracket chars and the separator */
+.sfc-inline-card .sfc-inline-hidden,
+.sfc-inline-card .sfc-inline-sep { display: none; }
+
+/* (Q :: A) — hide-back: show Q underlined, hide A */
+.sfc-inline-card[data-display="hide-back"] .sfc-inline-back { display: none; }
+.sfc-inline-card[data-display="hide-back"] .sfc-inline-front {
+  border-bottom: 1px dotted var(--text-accent);
+  cursor: default;
+}
+
+/* {Q :: A} — hide-front: hide Q, show A underlined */
+.sfc-inline-card[data-display="hide-front"] .sfc-inline-front { display: none; }
+.sfc-inline-card[data-display="hide-front"] .sfc-inline-back {
+  border-bottom: 1px dotted var(--text-accent);
+  cursor: default;
+}
+
+/* ── Sidebar Panel ─────────────────────────────── */
+.sfc-panel {
+  padding: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.sfc-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 4px 2px 8px;
+  border-bottom: 1px solid var(--background-modifier-border);
+  margin-bottom: 4px;
+}
+
+.sfc-panel-header h4 {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sfc-review-btn {
+  font-size: 11px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+}
+
+.sfc-review-btn:hover {
+  opacity: 0.85;
+}
+
+.sfc-card-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  background: var(--background-secondary);
+  border: 1px solid var(--background-modifier-border);
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.sfc-card-row:hover {
+  background: var(--background-modifier-hover);
+}
+
+.sfc-card-type {
+  font-size: 14px;
+  min-width: 18px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.sfc-card-front {
+  flex: 1;
+  font-size: 12px;
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sfc-due-pill {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.sfc-due-pill.overdue {
+  background: rgba(220, 50, 50, 0.15);
+  color: var(--color-red);
+}
+
+.sfc-due-pill.due-today {
+  background: rgba(230, 160, 0, 0.15);
+  color: var(--color-yellow);
+}
+
+.sfc-due-pill.upcoming {
+  background: rgba(50, 180, 80, 0.12);
+  color: var(--color-green);
+}
+
+.sfc-due-pill.new {
+  background: rgba(100, 130, 220, 0.15);
+  color: var(--color-blue);
+}
+
+.sfc-empty-state {
+  color: var(--text-faint);
+  font-size: 12px;
+  text-align: center;
+  padding: 20px 8px;
+}
+
+/* ── Review Modal ──────────────────────────────── */
+.sfc-review-modal .modal-content {
+  padding: 0;
+  overflow: hidden;
+}
+
+.sfc-review-modal .modal {
+  max-width: 680px;
+  width: 90vw;
+}
+
+.sfc-review-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 14px 20px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.sfc-review-progress {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.sfc-card-type-badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 10px;
+  background: var(--background-secondary);
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.sfc-review-body {
+  padding: 32px 24px;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 20px;
+}
+
+.sfc-card-front-display {
+  font-size: 20px;
+  font-weight: 500;
+  text-align: center;
+  line-height: 1.5;
+  color: var(--text-normal);
+  width: 100%;
+}
+
+.sfc-card-front-display.dimmed {
+  font-size: 14px;
+  color: var(--text-muted);
+  font-weight: 400;
+}
+
+.sfc-card-back-display {
+  font-size: 22px;
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.5;
+  color: var(--text-normal);
+  width: 100%;
+  padding-top: 16px;
+  border-top: 1px solid var(--background-modifier-border);
+}
+
+.sfc-cloze-blank {
+  display: inline-block;
+  background: var(--interactive-accent);
+  color: var(--interactive-accent);
+  border-radius: 3px;
+  padding: 0 4px;
+  min-width: 40px;
+  user-select: none;
+}
+
+.sfc-cloze-blank.revealed {
+  background: rgba(100, 180, 100, 0.2);
+  color: var(--color-green);
+}
+
+.sfc-show-answer-btn {
+  padding: 10px 28px;
+  font-size: 15px;
+  border-radius: 8px;
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+  border: none;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.sfc-show-answer-btn:hover {
+  opacity: 0.85;
+}
+
+.sfc-rating-area {
+  padding: 16px 20px;
+  border-top: 1px solid var(--background-modifier-border);
+  background: var(--background-secondary);
+}
+
+.sfc-rating-label {
+  text-align: center;
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-bottom: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sfc-rating-buttons {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.sfc-rating-btn {
+  flex: 1;
+  max-width: 120px;
+  padding: 10px 8px 6px;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.1s;
+}
+
+.sfc-rating-btn .btn-label {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.sfc-rating-btn .btn-interval {
+  font-size: 10px;
+  opacity: 0.75;
+}
+
+.sfc-rating-btn.again {
+  background: rgba(220, 50, 50, 0.1);
+  color: #e05555;
+  border-color: rgba(220, 50, 50, 0.3);
+}
+
+.sfc-rating-btn.hard {
+  background: rgba(220, 140, 30, 0.1);
+  color: #d98830;
+  border-color: rgba(220, 140, 30, 0.3);
+}
+
+.sfc-rating-btn.good {
+  background: rgba(50, 130, 220, 0.1);
+  color: #4a90d9;
+  border-color: rgba(50, 130, 220, 0.3);
+}
+
+.sfc-rating-btn.easy {
+  background: rgba(50, 180, 80, 0.1);
+  color: #3ab860;
+  border-color: rgba(50, 180, 80, 0.3);
+}
+
+.sfc-rating-btn:hover {
+  filter: brightness(1.1);
+  transform: translateY(-1px);
+}
+
+/* ── Dashboard Modal ───────────────────────────── */
+.sfc-dashboard-modal .modal {
+  max-width: 600px;
+  width: 90vw;
+}
+
+.sfc-dashboard-modal .modal-content {
+  padding: 0;
+}
+
+.sfc-dashboard-header {
+  padding: 24px 24px 16px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.sfc-dashboard-header h2 {
+  margin: 0 0 4px;
+  font-size: 20px;
+}
+
+.sfc-dashboard-header .sfc-date {
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.sfc-dashboard-stats {
+  display: flex;
+  gap: 16px;
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.sfc-stat-block {
+  flex: 1;
+  text-align: center;
+  padding: 12px;
+  border-radius: 8px;
+  background: var(--background-secondary);
+}
+
+.sfc-stat-block .stat-number {
+  font-size: 28px;
+  font-weight: 700;
+  color: var(--text-normal);
+  line-height: 1;
+}
+
+.sfc-stat-block .stat-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sfc-dashboard-section {
+  padding: 16px 24px;
+  border-bottom: 1px solid var(--background-modifier-border);
+}
+
+.sfc-dashboard-section h3 {
+  margin: 0 0 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.sfc-note-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 160px;
+  overflow-y: auto;
+}
+
+.sfc-note-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-size: 13px;
+  background: var(--background-secondary);
+}
+
+.sfc-note-item .note-name {
+  color: var(--text-normal);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sfc-note-item .note-count {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  margin-left: 8px;
+}
+
+.sfc-dashboard-actions {
+  padding: 16px 24px;
+  display: flex;
+  gap: 10px;
+}
+
+.sfc-start-btn {
+  flex: 1;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+}
+
+.sfc-start-btn.primary {
+  background: var(--interactive-accent);
+  color: var(--text-on-accent);
+}
+
+.sfc-start-btn.secondary {
+  background: var(--background-secondary);
+  color: var(--text-normal);
+  border: 1px solid var(--background-modifier-border);
+}
+
+.sfc-start-btn:hover {
+  opacity: 0.85;
+}
+
+.sfc-streak-badge {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-muted);
+  padding: 4px 8px;
+}
+
+/* ── Summary Modal ─────────────────────────────── */
+.sfc-summary-modal .modal {
+  max-width: 420px;
+  width: 90vw;
+}
+
+.sfc-summary-body {
+  padding: 32px 24px;
+  text-align: center;
+}
+
+.sfc-summary-body h2 {
+  margin: 0 0 8px;
+  font-size: 22px;
+}
+
+.sfc-summary-body p {
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* ── Settings ──────────────────────────────────── */
+.sfc-settings-excluded-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 8px;
+}
+
+.sfc-settings-excluded-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 10px;
+  border-radius: 6px;
+  background: var(--background-secondary);
+  font-size: 13px;
+}
+
+.sfc-settings-excluded-item button {
+  background: none;
+  border: none;
+  cursor: pointer;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+.sfc-settings-excluded-item button:hover {
+  color: var(--color-red);
+}
