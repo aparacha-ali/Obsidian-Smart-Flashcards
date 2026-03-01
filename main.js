@@ -1309,17 +1309,45 @@ SmartFlashcardsPlugin._getHoverPopover = function() {
   return SmartFlashcardsPlugin._hoverPopover;
 };
 
+/**
+ * Show the hover popover anchored below anchorEl.
+ * content: either a plain string, or { front, arrow, back } for card layout.
+ */
 SmartFlashcardsPlugin._showHoverPopover = function(anchorEl, label, content) {
   const popover = SmartFlashcardsPlugin._getHoverPopover();
   popover.innerHTML = '';
-  const labelEl = document.createElement('div');
-  labelEl.className = 'sfc-hover-label';
-  labelEl.textContent = label;
-  const contentEl = document.createElement('div');
-  contentEl.className = 'sfc-hover-content';
-  contentEl.textContent = content;
-  popover.appendChild(labelEl);
-  popover.appendChild(contentEl);
+
+  if (label) {
+    const labelEl = document.createElement('div');
+    labelEl.className = 'sfc-hover-label';
+    labelEl.textContent = label;
+    popover.appendChild(labelEl);
+  }
+
+  if (typeof content === 'string') {
+    const contentEl = document.createElement('div');
+    contentEl.className = 'sfc-hover-content';
+    contentEl.textContent = content;
+    popover.appendChild(contentEl);
+  } else {
+    // Card layout: { front, arrow, back }
+    const cardEl = document.createElement('div');
+    cardEl.className = 'sfc-hover-card';
+    const frontEl = document.createElement('span');
+    frontEl.className = 'sfc-hover-front';
+    frontEl.textContent = content.front;
+    const arrowEl = document.createElement('span');
+    arrowEl.className = 'sfc-hover-arrow';
+    arrowEl.textContent = content.arrow;
+    const backEl = document.createElement('span');
+    backEl.className = 'sfc-hover-back';
+    backEl.textContent = content.back;
+    cardEl.appendChild(frontEl);
+    cardEl.appendChild(arrowEl);
+    cardEl.appendChild(backEl);
+    popover.appendChild(cardEl);
+  }
+
   popover.style.display = 'block';
   const rect = anchorEl.getBoundingClientRect();
   popover.style.left = `${rect.left}px`;
@@ -1390,16 +1418,12 @@ SmartFlashcardsPlugin._processInlineCardElements = function(el) {
       span.appendChild(backEl);
       span.appendChild(mkHidden(close));
 
-      // Hover preview: show the hidden side
-      if (displayMode === 'hide-back') {
-        const backText = back.trim();
-        frontEl.addEventListener('mouseenter', () => SmartFlashcardsPlugin._showHoverPopover(frontEl, 'Answer', backText));
-        frontEl.addEventListener('mouseleave', SmartFlashcardsPlugin._hideHoverPopover);
-      } else {
-        const frontText = front.trim();
-        backEl.addEventListener('mouseenter', () => SmartFlashcardsPlugin._showHoverPopover(backEl, 'Question', frontText));
-        backEl.addEventListener('mouseleave', SmartFlashcardsPlugin._hideHoverPopover);
-      }
+      // Hover preview: show both sides with directional arrow
+      const arrow = sep === ':::' ? '↔' : '→';
+      span.addEventListener('mouseenter', () => SmartFlashcardsPlugin._showHoverPopover(
+        span, null, { front: front.trim(), arrow, back: back.trim() }
+      ));
+      span.addEventListener('mouseleave', SmartFlashcardsPlugin._hideHoverPopover);
 
       frag.appendChild(span);
       lastIdx = m.index + fullMatch.length;

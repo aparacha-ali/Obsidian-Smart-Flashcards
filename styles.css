@@ -51,12 +51,30 @@ body.sfc-review-open .popover {
   text-transform: uppercase;
   letter-spacing: 0.05em;
   color: var(--text-muted);
-  margin-bottom: 2px;
+  margin-bottom: 4px;
 }
 
 .sfc-hover-content {
   font-size: 13px;
   color: var(--text-normal);
+}
+
+.sfc-hover-card {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+}
+
+.sfc-hover-front,
+.sfc-hover-back {
+  color: var(--text-normal);
+}
+
+.sfc-hover-arrow {
+  color: var(--text-accent);
+  font-weight: 600;
+  flex-shrink: 0;
 }
 
 /* ── Sidebar Panel ─────────────────────────────── */
