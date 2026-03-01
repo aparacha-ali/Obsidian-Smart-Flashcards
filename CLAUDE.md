@@ -41,26 +41,18 @@ Companion note: `📚 Review Dashboard.md` (DataviewJS, vault root)
 
 ## Data Storage
 
-### Standalone card SRS data — inline comment, line immediately after card
-```
-Capital of France :: Paris
-<!--SFC:{"d":"2026-03-01","i":3,"e":2.5,"r":2}-->
-```
-Fields: `d`=due date (ISO), `i`=interval (days), `e`=ease factor, `r`=rep count.
-
-Bidirectional stores both directions in one comment:
-```
-<!--SFC:{"f":{"d":"...","i":3,"e":2.5,"r":2},"b":{"d":"...","i":1,"e":2.5,"r":0}}-->
-```
-
-### Inline card SRS data — frontmatter `sfc-cards` object
+### Card SRS data — frontmatter `sfc-cards` object (all card types)
 ```yaml
 sfc-cards:
   "Capital of France": { d: "2026-03-01", i: 3, e: 2.5, r: 2 }
   "powerhouse of the cell__back": { d: "2026-03-02", i: 1, e: 2.5, r: 0 }
 ```
+All card types (basic, bidirectional, cloze, inline) store SRS data here.
 Key = front text. Bidirectional back direction uses `front + '__back'` as key.
+Cloze cards use the full line (including `=-=markers=-=`) as key.
 `displayMode` (`hide-back`/`hide-front`) is NOT stored — re-derived from syntax (`(` vs `{`) at parse time.
+
+Fields: `d`=due date (ISO), `i`=interval (days), `e`=ease factor, `r`=rep count.
 
 ### Note-level SRS data — frontmatter fields
 ```yaml
@@ -86,7 +78,6 @@ Uses `srs-` prefix (distinct from old SR plugin's `sr-` fields).
 
 ### Constants / top-level
 - `VIEW_TYPE = 'smart-flashcards-panel'`
-- `SFC_PREFIX = '<!--SFC:'`, `SFC_SUFFIX = '-->'`
 - `NOTE_INTERVALS = [1,3,7,14,30,60,90]` — fixed note-review progression
 - `DEFAULT_SETTINGS` — default plugin settings object
 
@@ -107,13 +98,11 @@ SM-2 spaced repetition algorithm.
 - `CardParser._matchBasic(line)`, `_matchBidirectional(line)`, `_matchCloze(line)`
 - `CardParser.renderClozeFront(text)` → HTML with `<span class="sfc-cloze-blank">`
 - `CardParser.renderClozeBack(text)` → HTML with `<span class="sfc-cloze-blank revealed">`
-- `CardParser._parseSfcComment(line)` → parsed JSON object or null
 
 ### `StorageManager` (class)
 - `isExcluded(filePath)` — checks against `settings.excludedFolders`
 - `isNoteOptedOut(file)` — excluded folder OR `srs: false` frontmatter
-- `updateCardSRS(file, lineIndex, newSrsData)` — writes/replaces `<!--SFC:-->` comment
-- `updateInlineCardSRS(file, frontText, newSrsData, direction)` — writes to `sfc-cards` frontmatter
+- `updateCardSRS(file, frontText, newSrsData, direction)` — writes to `sfc-cards` frontmatter (all card types)
 - `updateNoteSRS(file, interval, reps)` — writes `srs-due/interval/reps` frontmatter
 - `getAllDueCards()` — scans all vault files; passes `inlineSrsMap` from metadata cache to `parseCards`
 - `getAllDueNotes()` — files with `srs !== false` and `srs-due <= today`

@@ -8,7 +8,8 @@
  *   Cloze              : Sentence with =-=hidden text=-= inside
  *
  * Data storage:
- *   Cards  → inline <!--SFC:{...}--> comment on the line immediately after each card
+ *   Cards  → frontmatter `sfc-cards` object, keyed by front text
+ *            (bidirectional back direction uses key = front + '__back')
  *   Notes  → frontmatter fields srs-due, srs-interval, srs-reps
  *   Config → data.json (excludedFolders, streak, etc.)
  */
@@ -22,8 +23,6 @@ const { Plugin, ItemView, Modal, Notice, MarkdownRenderer, Setting, PluginSettin
 // ─────────────────────────────────────────────────────────────
 
 const VIEW_TYPE = 'smart-flashcards-panel';
-const SFC_PREFIX = '<!--SFC:';
-const SFC_SUFFIX = '-->';
 
 /** Fixed note-review interval progression (days) indexed by reps count */
 const NOTE_INTERVALS = [1, 3, 7, 14, 30, 60, 90];
@@ -152,9 +151,6 @@ const CardParser = {
       if (CardParser._inRanges(i, commentRanges)) continue;
       if (CardParser._inRanges(i, codeRanges)) continue;
 
-      // Skip SFC data comment lines themselves
-      if (line.trimStart().startsWith(SFC_PREFIX)) continue;
-
       // ── Inline cards: (Q :: A) or {Q :: A} embedded within prose ──
       // Check these first so parens/braces don't confuse the standalone matchers.
       const inlineMatches = CardParser._matchInlineCards(line);
@@ -178,22 +174,20 @@ const CardParser = {
         continue; // don't also try standalone parsing on the same line
       }
 
-      // Read SRS data from next line if it's an SFC comment
-      const nextLine = lines[i + 1] ? lines[i + 1].trim() : '';
-      const nextSrs = CardParser._parseSfcComment(nextLine);
-
       // ── Bidirectional (check before basic so ::: isn't caught by ::) ──
       const biMatch = CardParser._matchBidirectional(line);
       if (biMatch) {
+        const biSrsForward = inlineSrsMap[biMatch.front] || null;
+        const biSrsBack = inlineSrsMap[biMatch.front + '__back'] || null;
         cards.push({
           type: 'bidirectional',
           front: biMatch.front,
           back: biMatch.back,
           lineIndex: i,
           isInline: false,
-          srsData: nextSrs,
-          srsDataForward: nextSrs ? (nextSrs.f || null) : null,
-          srsDataBack: nextSrs ? (nextSrs.b || null) : null,
+          srsData: biSrsForward,
+          srsDataForward: biSrsForward,
+          srsDataBack: biSrsBack,
         });
         continue;
       }
@@ -201,14 +195,15 @@ const CardParser = {
       // ── Basic (single-directional) ──
       const basicMatch = CardParser._matchBasic(line);
       if (basicMatch) {
+        const basicSrs = inlineSrsMap[basicMatch.front] || null;
         cards.push({
           type: 'basic',
           front: basicMatch.front,
           back: basicMatch.back,
           lineIndex: i,
           isInline: false,
-          srsData: nextSrs,
-          srsDataForward: nextSrs,
+          srsData: basicSrs,
+          srsDataForward: basicSrs,
           srsDataBack: null,
         });
         continue;
@@ -217,14 +212,15 @@ const CardParser = {
       // ── Cloze ──
       const clozeMatch = CardParser._matchCloze(line);
       if (clozeMatch) {
+        const clozeSrs = inlineSrsMap[line] || null;
         cards.push({
           type: 'cloze',
-          front: line,   // full line with =-= markers
+          front: line,   // full line with =-= markers (also used as sfc-cards key)
           back: line,    // same — rendering handles blank/reveal
           lineIndex: i,
           isInline: false,
-          srsData: nextSrs,
-          srsDataForward: Array.isArray(nextSrs) ? (nextSrs[0] || null) : nextSrs,
+          srsData: clozeSrs,
+          srsDataForward: clozeSrs,
           srsDataBack: null,
           clozeSegments: clozeMatch,
         });
@@ -323,13 +319,6 @@ const CardParser = {
     return ranges.some(([s, e]) => idx >= s && idx <= e);
   },
 
-  /** Parse <!--SFC:{...}--> from a line, return the object or null */
-  _parseSfcComment(line) {
-    if (!line.startsWith(SFC_PREFIX)) return null;
-    const inner = line.slice(SFC_PREFIX.length, line.lastIndexOf(SFC_SUFFIX));
-    try { return JSON.parse(inner); } catch { return null; }
-  },
-
   /** Render a cloze front (replace =-=...=-= with blanks) */
   renderClozeFront(text) {
     return text.replace(/=-=(.+?)=-=/g, '<span class="sfc-cloze-blank">$1</span>');
@@ -368,27 +357,8 @@ class StorageManager {
     return cache.frontmatter.srs === false;
   }
 
-  /**
-   * Update the SRS comment for a card at the given line index.
-   * If the next line is already an SFC comment, replace it.
-   * Otherwise insert a new line after the card.
-   */
-  async updateCardSRS(file, lineIndex, newSrsData) {
-    const content = await this.app.vault.read(file);
-    const lines = content.split('\n');
-    const commentLine = `${SFC_PREFIX}${JSON.stringify(newSrsData)}${SFC_SUFFIX}`;
-
-    if (lines[lineIndex + 1] && lines[lineIndex + 1].trim().startsWith(SFC_PREFIX)) {
-      lines[lineIndex + 1] = commentLine;
-    } else {
-      lines.splice(lineIndex + 1, 0, commentLine);
-    }
-
-    await this.app.vault.modify(file, lines.join('\n'));
-  }
-
-  /** Update SRS data for an inline card (stored in frontmatter sfc-cards map) */
-  async updateInlineCardSRS(file, frontText, newSrsData, direction = 'forward') {
+  /** Update SRS data for a card (stored in frontmatter sfc-cards map, keyed by front text) */
+  async updateCardSRS(file, frontText, newSrsData, direction = 'forward') {
     const key = direction === 'back' ? frontText + '__back' : frontText;
     await this.app.fileManager.processFrontMatter(file, (fm) => {
       if (!fm['sfc-cards']) fm['sfc-cards'] = {};
@@ -799,32 +769,9 @@ class ReviewModal extends Modal {
     const card = this._currentCard();
     const newSrs = SM2.review(card.srsData, quality);
 
-    // Write updated SRS data back to the file
+    // Write updated SRS data back to the note's frontmatter
     try {
-      if (card.isInline) {
-        // Inline cards: store in frontmatter sfc-cards map
-        await this.storage.updateInlineCardSRS(card.file, card.front, newSrs, card.direction);
-      } else {
-        // Standalone cards: update the <!--SFC:--> comment after the card line
-        const content = await this.app.vault.read(card.file);
-        const freshCards = CardParser.parseCards(content);
-        const fresh = freshCards.find(c => c.lineIndex === card.lineIndex);
-
-        if (fresh) {
-          let newComment;
-          if (card.type === 'bidirectional') {
-            const existing = fresh.srsData || {};
-            if (card.direction === 'forward') {
-              newComment = { f: newSrs, b: existing.b || null };
-            } else {
-              newComment = { f: existing.f || null, b: newSrs };
-            }
-          } else {
-            newComment = newSrs;
-          }
-          await this.storage.updateCardSRS(card.file, fresh.lineIndex, newComment);
-        }
-      }
+      await this.storage.updateCardSRS(card.file, card.front, newSrs, card.direction);
     } catch (e) {
       console.warn('Smart Flashcards: failed to save SRS data', e);
     }
