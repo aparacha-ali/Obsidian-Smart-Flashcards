@@ -1185,10 +1185,11 @@ class SmartFlashcardsPlugin extends Plugin {
     const currentFile = this.app.workspace.getActiveFile();
     if (currentFile) this._checkNoteBanner(currentFile);
 
-    // ── Markdown post-processor: render inline (Q :: A) / {Q :: A} cards ──
+    // ── Markdown post-processor: render inline cards and cloze markers ──
     this.registerMarkdownPostProcessor((el, ctx) => {
       if (ctx.frontmatter?.srs === false) return;
       SmartFlashcardsPlugin._processInlineCardElements(el);
+      SmartFlashcardsPlugin._processClozeElements(el);
     });
   }
 
@@ -1347,6 +1348,46 @@ SmartFlashcardsPlugin._processInlineCardElements = function(el) {
     }
 
     if (lastIdx === 0) continue; // no matches in this text node
+    if (lastIdx < text.length) frag.appendChild(document.createTextNode(text.slice(lastIdx)));
+    textNode.parentNode.replaceChild(frag, textNode);
+  }
+};
+
+SmartFlashcardsPlugin._processClozeElements = function(el) {
+  const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
+    acceptNode(node) {
+      if (node.parentElement?.closest('code, pre, .sfc-inline-card, .sfc-cloze-reading')) {
+        return NodeFilter.FILTER_REJECT;
+      }
+      return NodeFilter.FILTER_ACCEPT;
+    },
+  });
+
+  const textNodes = [];
+  let node;
+  while ((node = walker.nextNode())) textNodes.push(node);
+
+  for (const textNode of textNodes) {
+    const text = textNode.textContent;
+    if (!text.includes('=-=')) continue;
+
+    const regex = /=-=(.+?)=-=/g;
+    const frag = document.createDocumentFragment();
+    let lastIdx = 0;
+    let hasMatch = false;
+    let m;
+
+    while ((m = regex.exec(text)) !== null) {
+      hasMatch = true;
+      if (m.index > lastIdx) frag.appendChild(document.createTextNode(text.slice(lastIdx, m.index)));
+      const span = document.createElement('span');
+      span.className = 'sfc-cloze-reading';
+      span.textContent = m[1];
+      frag.appendChild(span);
+      lastIdx = m.index + m[0].length;
+    }
+
+    if (!hasMatch) continue;
     if (lastIdx < text.length) frag.appendChild(document.createTextNode(text.slice(lastIdx)));
     textNode.parentNode.replaceChild(frag, textNode);
   }

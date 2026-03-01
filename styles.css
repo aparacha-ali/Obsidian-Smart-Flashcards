@@ -26,6 +26,12 @@ body.sfc-review-open .popover {
   cursor: default;
 }
 
+/* =-=cloze=-= markers in reading mode */
+.sfc-cloze-reading {
+  border-bottom: 1px dotted var(--text-accent);
+  cursor: default;
+}
+
 /* ── Sidebar Panel ─────────────────────────────── */
 .sfc-panel {
   padding: 8px;
