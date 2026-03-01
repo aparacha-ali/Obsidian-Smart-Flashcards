@@ -344,15 +344,6 @@ const CardParser = {
     return ranges.some(([s, e]) => idx >= s && idx <= e);
   },
 
-  /** Render a cloze front (replace =-=...=-= with blanks) */
-  renderClozeFront(text) {
-    return text.replace(/=-=(.+?)=-=/g, '<span class="sfc-cloze-blank">$1</span>');
-  },
-
-  /** Render a cloze back (reveal =-=...=-= with highlighted text) */
-  renderClozeBack(text) {
-    return text.replace(/=-=(.+?)=-=/g, '<span class="sfc-cloze-blank revealed">$1</span>');
-  },
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -766,18 +757,12 @@ class ReviewModal extends Modal {
     });
   }
 
-  /** For cloze innerHTML: convert [[wikilinks]] to display text */
-  _wikilinksToText(text) {
-    return text
-      .replace(/\[\[([^\]|]+)\|([^\]]+)\]\]/g, '$2')
-      .replace(/\[\[([^\]]+)\]\]/g, (_, link) => link.split('/').pop().split('#').pop());
-  }
-
   async _renderFront(body, card) {
     const frontEl = body.createDiv({ cls: 'sfc-card-front-display' });
 
     if (card.type === 'cloze') {
-      frontEl.innerHTML = CardParser.renderClozeFront(this._wikilinksToText(card.front));
+      await this._renderMd(frontEl, card.front, card.file);
+      SmartFlashcardsPlugin._applyClozeDOM(frontEl, 'sfc-cloze-blank');
     } else if (card.direction === 'back') {
       // Reverse direction: show the "back" as the question
       await this._renderMd(frontEl, card.back, card.file);
@@ -799,13 +784,16 @@ class ReviewModal extends Modal {
     // Dimmed question
     const frontEl = body.createDiv({ cls: 'sfc-card-front-display dimmed' });
     if (card.direction === 'back') await this._renderMd(frontEl, card.back, card.file);
-    else if (card.type === 'cloze') frontEl.innerHTML = CardParser.renderClozeFront(this._wikilinksToText(card.front));
-    else await this._renderMd(frontEl, card.front, card.file);
+    else if (card.type === 'cloze') {
+      await this._renderMd(frontEl, card.front, card.file);
+      SmartFlashcardsPlugin._applyClozeDOM(frontEl, 'sfc-cloze-blank');
+    } else await this._renderMd(frontEl, card.front, card.file);
 
     // Answer
     const backEl = body.createDiv({ cls: 'sfc-card-back-display' });
     if (card.type === 'cloze') {
-      backEl.innerHTML = CardParser.renderClozeBack(this._wikilinksToText(card.back));
+      await this._renderMd(backEl, card.back, card.file);
+      SmartFlashcardsPlugin._applyClozeDOM(backEl, 'sfc-cloze-blank revealed');
     } else if (card.direction === 'back') {
       await this._renderMd(backEl, card.front, card.file);
     } else {
@@ -1435,47 +1423,72 @@ SmartFlashcardsPlugin._processInlineCardElements = function(el) {
   }
 };
 
-SmartFlashcardsPlugin._processClozeElements = function(el) {
+/**
+ * DOM Range-based cloze processor.
+ *
+ * Finds =-= marker text nodes across the rendered DOM (including across
+ * HTML elements like <strong>, <a>, etc.), wraps the content between each
+ * opening/closing pair in a span with the given class, and strips the markers.
+ *
+ * Works whether cloze content is plain text or rendered markdown.
+ */
+SmartFlashcardsPlugin._applyClozeDOM = function(el, cls) {
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
-      if (node.parentElement?.closest('code, pre, .sfc-inline-card, .sfc-cloze-reading')) {
-        return NodeFilter.FILTER_REJECT;
-      }
+      if (node.parentElement?.closest('code, pre')) return NodeFilter.FILTER_REJECT;
       return NodeFilter.FILTER_ACCEPT;
     },
   });
 
-  const textNodes = [];
+  // Collect all =-= marker positions across text nodes
+  const markers = [];
   let node;
-  while ((node = walker.nextNode())) textNodes.push(node);
-
-  for (const textNode of textNodes) {
-    const text = textNode.textContent;
-    if (!text.includes('=-=')) continue;
-
-    const regex = /=-=(.+?)=-=/g;
-    const frag = document.createDocumentFragment();
-    let lastIdx = 0;
-    let hasMatch = false;
-    let m;
-
-    while ((m = regex.exec(text)) !== null) {
-      hasMatch = true;
-      if (m.index > lastIdx) frag.appendChild(document.createTextNode(text.slice(lastIdx, m.index)));
-      const span = document.createElement('span');
-      span.className = 'sfc-cloze-reading';
-      span.textContent = m[1];
-      const clozeText = m[1];
-      span.addEventListener('mouseenter', () => SmartFlashcardsPlugin._showHoverPopover(span, 'Cloze', `_____ → ${clozeText}`));
-      span.addEventListener('mouseleave', SmartFlashcardsPlugin._hideHoverPopover);
-      frag.appendChild(span);
-      lastIdx = m.index + m[0].length;
+  while ((node = walker.nextNode())) {
+    const text = node.textContent;
+    let idx = 0;
+    while ((idx = text.indexOf('=-=', idx)) !== -1) {
+      markers.push({ node, offset: idx });
+      idx += 3;
     }
-
-    if (!hasMatch) continue;
-    if (lastIdx < text.length) frag.appendChild(document.createTextNode(text.slice(lastIdx)));
-    textNode.parentNode.replaceChild(frag, textNode);
   }
+
+  // Pair markers and process in reverse order to preserve earlier positions
+  const pairCount = Math.floor(markers.length / 2);
+  for (let p = pairCount - 1; p >= 0; p--) {
+    const open = markers[p * 2];
+    const close = markers[p * 2 + 1];
+
+    // Range spans from end of opening =-= to start of closing =-=
+    const range = document.createRange();
+    range.setStart(open.node, open.offset + 3);
+    range.setEnd(close.node, close.offset);
+
+    const span = document.createElement('span');
+    span.className = cls;
+    span.appendChild(range.extractContents());
+    range.insertNode(span);
+
+    // Strip the =-= marker from the adjacent text nodes
+    const prev = span.previousSibling;
+    if (prev?.nodeType === Node.TEXT_NODE && prev.textContent.endsWith('=-=')) {
+      prev.textContent = prev.textContent.slice(0, -3);
+    }
+    const next = span.nextSibling;
+    if (next?.nodeType === Node.TEXT_NODE && next.textContent.startsWith('=-=')) {
+      next.textContent = next.textContent.slice(3);
+    }
+  }
+};
+
+SmartFlashcardsPlugin._processClozeElements = function(el) {
+  SmartFlashcardsPlugin._applyClozeDOM(el, 'sfc-cloze-reading');
+
+  // Add hover preview to each newly created cloze span
+  el.querySelectorAll('.sfc-cloze-reading').forEach(span => {
+    const clozeText = span.textContent;
+    span.addEventListener('mouseenter', () => SmartFlashcardsPlugin._showHoverPopover(span, 'Cloze', `_____ → ${clozeText}`));
+    span.addEventListener('mouseleave', SmartFlashcardsPlugin._hideHoverPopover);
+  });
 };
 
 module.exports = SmartFlashcardsPlugin;
