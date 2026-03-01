@@ -34,6 +34,31 @@ const DEFAULT_SETTINGS = {
 };
 
 // ─────────────────────────────────────────────────────────────
+// DATE HELPERS  (always work in local time — avoids UTC-shift bug)
+// ─────────────────────────────────────────────────────────────
+
+/** Parse a YYYY-MM-DD string as local midnight */
+function localDateFromStr(str) {
+  const [y, m, d] = str.split('-').map(Number);
+  return new Date(y, m - 1, d);
+}
+
+/** Today at local midnight */
+function localToday() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+/** Format a Date as YYYY-MM-DD in local time */
+function localDateStr(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
+
+// ─────────────────────────────────────────────────────────────
 // SM-2 ALGORITHM
 // ─────────────────────────────────────────────────────────────
 
@@ -69,7 +94,7 @@ const SM2 = {
     due.setDate(due.getDate() + newInterval);
 
     return {
-      d: due.toISOString().slice(0, 10),
+      d: localDateStr(due),
       i: newInterval,
       e: Math.round(newEase * 100) / 100,
       r: newReps,
@@ -80,13 +105,13 @@ const SM2 = {
   isDue(srsData) {
     if (!srsData) return true;
     if (!srsData.d) return true;
-    return new Date(srsData.d) <= new Date();
+    return localDateFromStr(srsData.d) <= localToday();
   },
 
   /** Returns the due date as a Date object, or null for new cards */
   getDueDate(srsData) {
     if (!srsData || !srsData.d) return null;
-    return new Date(srsData.d);
+    return localDateFromStr(srsData.d);
   },
 
   /** Preview what intervals each rating would give */
@@ -370,7 +395,7 @@ class StorageManager {
   async updateNoteSRS(file, interval, reps) {
     const due = new Date();
     due.setDate(due.getDate() + interval);
-    const dueStr = due.toISOString().slice(0, 10);
+    const dueStr = localDateStr(due);
 
     await this.app.fileManager.processFrontMatter(file, (fm) => {
       fm['srs-due'] = dueStr;
@@ -416,8 +441,7 @@ class StorageManager {
   /** Get all notes that have a srs-due <= today and are not opted out */
   async getAllDueNotes() {
     const files = this.app.vault.getMarkdownFiles();
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = localToday();
     const due = [];
 
     for (const file of files) {
@@ -426,9 +450,7 @@ class StorageManager {
       if (!cache || !cache.frontmatter) continue;
       const srsDue = cache.frontmatter['srs-due'];
       if (!srsDue) continue;
-      const dueDate = new Date(srsDue);
-      dueDate.setHours(0, 0, 0, 0);
-      if (dueDate <= today) due.push(file);
+      if (localDateFromStr(srsDue) <= today) due.push(file);
     }
 
     return due;
@@ -515,8 +537,7 @@ class FlashcardPanelView extends ItemView {
     const cache = this.app.metadataCache.getFileCache(file);
     const inlineSrsMap = cache?.frontmatter?.['sfc-cards'] || {};
     const cards = CardParser.parseCards(content, inlineSrsMap);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const today = localToday();
 
     const panel = container.createDiv({ cls: 'sfc-panel' });
 
@@ -573,8 +594,7 @@ class FlashcardPanelView extends ItemView {
         pill.addClass('new');
         pill.setText('New');
       } else {
-        const dueDate = new Date(primarySrs.d);
-        dueDate.setHours(0, 0, 0, 0);
+        const dueDate = localDateFromStr(primarySrs.d);
         const diff = Math.round((dueDate - today) / 86400000);
         if (diff < 0) { pill.addClass('overdue'); pill.setText(`${Math.abs(diff)}d late`); }
         else if (diff === 0) { pill.addClass('due-today'); pill.setText('Due today'); }
@@ -882,8 +902,7 @@ class DashboardModal extends Modal {
       sec.createEl('h3', { text: `Notes to Review (${dueNotes.length})` });
 
       const list = sec.createDiv({ cls: 'sfc-note-list' });
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
+      const today = localToday();
 
       for (const file of dueNotes.slice(0, 10)) {
         const cache = this.app.metadataCache.getFileCache(file);
@@ -891,9 +910,7 @@ class DashboardModal extends Modal {
         const item = list.createDiv({ cls: 'sfc-note-item' });
         item.createDiv({ cls: 'note-name', text: file.basename });
         if (srsDue) {
-          const d = new Date(srsDue);
-          d.setHours(0, 0, 0, 0);
-          const days = Math.round((today - d) / 86400000);
+          const days = Math.round((today - localDateFromStr(srsDue)) / 86400000);
           item.createDiv({ cls: 'note-count', text: days === 0 ? 'today' : `${days}d ago` });
         }
         item.style.cursor = 'pointer';
@@ -1169,10 +1186,8 @@ class SmartFlashcardsPlugin extends Plugin {
     const srsDue = cache.frontmatter['srs-due'];
     if (!srsDue) return; // Never scheduled yet — no banner (would be too noisy)
 
-    const dueDate = new Date(srsDue);
-    dueDate.setHours(0, 0, 0, 0);
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
+    const dueDate = localDateFromStr(srsDue);
+    const today = localToday();
 
     if (dueDate > today) return; // Not due yet
 
@@ -1203,15 +1218,15 @@ class SmartFlashcardsPlugin extends Plugin {
 
   /** Called after a review session completes — update streak */
   async onReviewComplete() {
-    const today = new Date().toISOString().slice(0, 10);
+    const today = localDateStr(localToday());
     const streak = this.settings.reviewStreak;
 
     if (streak.lastDate === today) {
       // Already reviewed today, don't increment
     } else {
-      const yesterday = new Date();
-      yesterday.setDate(yesterday.getDate() - 1);
-      const yStr = yesterday.toISOString().slice(0, 10);
+      const yDate = localToday();
+      yDate.setDate(yDate.getDate() - 1);
+      const yStr = localDateStr(yDate);
       streak.count = streak.lastDate === yStr ? streak.count + 1 : 1;
       streak.lastDate = today;
     }
