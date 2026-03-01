@@ -478,7 +478,7 @@ class FlashcardPanelView extends ItemView {
       this.app.workspace.on('active-leaf-change', this._onActiveLeafChange)
     );
     this.registerEvent(
-      this.app.vault.on('modify', (file) => {
+      this.app.metadataCache.on('changed', (file) => {
         if (file === this._currentFile) this._render(file);
       })
     );
