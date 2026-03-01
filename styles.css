@@ -32,6 +32,33 @@ body.sfc-review-open .popover {
   cursor: default;
 }
 
+/* ── Hover popover ──────────────────────────────── */
+.sfc-hover-popover {
+  position: fixed;
+  z-index: 9999;
+  background: var(--background-primary);
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 6px;
+  padding: 6px 10px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  pointer-events: none;
+  max-width: 320px;
+}
+
+.sfc-hover-label {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.sfc-hover-content {
+  font-size: 13px;
+  color: var(--text-normal);
+}
+
 /* ── Sidebar Panel ─────────────────────────────── */
 .sfc-panel {
   padding: 8px;
