@@ -8,7 +8,7 @@
  *   Cloze              : Sentence with =-=hidden text=-= inside
  *
  * Data storage:
- *   Cards  → frontmatter `sfc-cards` object, keyed by front text
+ *   Cards  → .smart-flashcards/srs-data.json (keyed by file path → card key)
  *            (bidirectional back direction uses key = front + '__back')
  *   Notes  → frontmatter fields srs-due, srs-interval, srs-reps
  *   Config → data.json (excludedFolders, streak, etc.)
@@ -356,6 +356,53 @@ const CardParser = {
 };
 
 // ─────────────────────────────────────────────────────────────
+// SRS DATABASE  (single JSON file for all card SRS data)
+// ─────────────────────────────────────────────────────────────
+
+const SRS_DB_PATH = '.smart-flashcards/srs-data.json';
+
+class SrsDatabase {
+  constructor(app) {
+    this.app = app;
+    this._data = {};  // { [filePath]: { [cardKey]: srsData } }
+  }
+
+  async load() {
+    const f = this.app.vault.getAbstractFileByPath(SRS_DB_PATH);
+    if (f) {
+      try { this._data = JSON.parse(await this.app.vault.read(f)); } catch { this._data = {}; }
+    }
+  }
+
+  async _save() {
+    const json = JSON.stringify(this._data, null, 2);
+    const f = this.app.vault.getAbstractFileByPath(SRS_DB_PATH);
+    if (f) {
+      await this.app.vault.modify(f, json);
+    } else {
+      const folder = this.app.vault.getAbstractFileByPath('.smart-flashcards');
+      if (!folder) await this.app.vault.createFolder('.smart-flashcards');
+      await this.app.vault.create(SRS_DB_PATH, json);
+    }
+  }
+
+  getFileMap(filePath) { return this._data[filePath] || {}; }
+
+  async set(filePath, key, srsData) {
+    if (!this._data[filePath]) this._data[filePath] = {};
+    this._data[filePath][key] = srsData;
+    await this._save();
+  }
+
+  async renameFile(oldPath, newPath) {
+    if (!this._data[oldPath]) return;
+    this._data[newPath] = this._data[oldPath];
+    delete this._data[oldPath];
+    await this._save();
+  }
+}
+
+// ─────────────────────────────────────────────────────────────
 // STORAGE MANAGER
 // ─────────────────────────────────────────────────────────────
 
@@ -363,6 +410,7 @@ class StorageManager {
   constructor(app, plugin) {
     this.app = app;
     this.plugin = plugin;
+    this.db = plugin.db;
   }
 
   /** Check if a file path is in an excluded folder */
@@ -382,13 +430,11 @@ class StorageManager {
     return cache.frontmatter.srs === false;
   }
 
-  /** Update SRS data for a card (stored in frontmatter sfc-cards map, keyed by front text) */
+  /** Update SRS data for a card (stored in .smart-flashcards/srs-data.json) */
   async updateCardSRS(file, frontText, newSrsData, direction = 'forward') {
     const key = direction === 'back' ? frontText + '__back' : frontText;
-    await this.app.fileManager.processFrontMatter(file, (fm) => {
-      if (!fm['sfc-cards']) fm['sfc-cards'] = {};
-      fm['sfc-cards'][key] = newSrsData;
-    });
+    await this.db.set(file.path, key, newSrsData);
+    this.app.workspace.trigger('sfc:srs-updated', file);
   }
 
   /** Update note-level SRS frontmatter fields */
@@ -415,8 +461,7 @@ class StorageManager {
       let content;
       try { content = await this.app.vault.read(file); } catch { continue; }
 
-      const cache = this.app.metadataCache.getFileCache(file);
-      const inlineSrsMap = cache?.frontmatter?.['sfc-cards'] || {};
+      const inlineSrsMap = this.db.getFileMap(file.path);
       const cards = CardParser.parseCards(content, inlineSrsMap);
       for (const card of cards) {
         // Bidirectional: check forward and back independently
@@ -504,6 +549,11 @@ class FlashcardPanelView extends ItemView {
         if (file === this._currentFile) this._render(file);
       })
     );
+    this.registerEvent(
+      this.app.workspace.on('sfc:srs-updated', (file) => {
+        if (file === this._currentFile) this._render(file);
+      })
+    );
     // Render for whichever note is currently open
     const activeFile = this.app.workspace.getActiveFile();
     if (activeFile) await this._render(activeFile);
@@ -534,8 +584,7 @@ class FlashcardPanelView extends ItemView {
       return;
     }
 
-    const cache = this.app.metadataCache.getFileCache(file);
-    const inlineSrsMap = cache?.frontmatter?.['sfc-cards'] || {};
+    const inlineSrsMap = this.plugin.db.getFileMap(file.path);
     const cards = CardParser.parseCards(content, inlineSrsMap);
     const today = localToday();
 
@@ -1035,7 +1084,14 @@ class SmartFlashcardsSettingTab extends PluginSettingTab {
 class SmartFlashcardsPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
+    this.db = new SrsDatabase(this.app);
+    await this.db.load();
     this.storage = new StorageManager(this.app, this);
+
+    // Keep db in sync when notes are renamed
+    this.registerEvent(
+      this.app.vault.on('rename', (file, oldPath) => this.db.renameFile(oldPath, file.path))
+    );
 
     // Register the sidebar panel view
     this.registerView(VIEW_TYPE, (leaf) => new FlashcardPanelView(leaf, this));
