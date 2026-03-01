@@ -762,7 +762,7 @@ class ReviewModal extends Modal {
 
     if (card.type === 'cloze') {
       await this._renderMd(frontEl, card.front, card.file);
-      SmartFlashcardsPlugin._applyClozeDOM(frontEl, 'sfc-cloze-blank');
+      SmartFlashcardsPlugin._applyClozeCls(frontEl, 'sfc-cloze-blank');
     } else if (card.direction === 'back') {
       // Reverse direction: show the "back" as the question
       await this._renderMd(frontEl, card.back, card.file);
@@ -786,14 +786,14 @@ class ReviewModal extends Modal {
     if (card.direction === 'back') await this._renderMd(frontEl, card.back, card.file);
     else if (card.type === 'cloze') {
       await this._renderMd(frontEl, card.front, card.file);
-      SmartFlashcardsPlugin._applyClozeDOM(frontEl, 'sfc-cloze-blank');
+      SmartFlashcardsPlugin._applyClozeCls(frontEl, 'sfc-cloze-blank');
     } else await this._renderMd(frontEl, card.front, card.file);
 
     // Answer
     const backEl = body.createDiv({ cls: 'sfc-card-back-display' });
     if (card.type === 'cloze') {
       await this._renderMd(backEl, card.back, card.file);
-      SmartFlashcardsPlugin._applyClozeDOM(backEl, 'sfc-cloze-blank revealed');
+      SmartFlashcardsPlugin._applyClozeCls(backEl, 'sfc-cloze-blank revealed');
     } else if (card.direction === 'back') {
       await this._renderMd(backEl, card.front, card.file);
     } else {
@@ -1432,6 +1432,24 @@ SmartFlashcardsPlugin._processInlineCardElements = function(el) {
  *
  * Works whether cloze content is plain text or rendered markdown.
  */
+/**
+ * Apply a cloze class to an element after _renderMd has run.
+ *
+ * Our post-processor (_processClozeElements) runs during MarkdownRenderer.render()
+ * and converts =-= markers into .sfc-cloze-reading spans before we can act on them.
+ * This helper reclassifies those spans to the target class (stripping the hover
+ * listeners by cloning), then falls back to _applyClozeDOM for any raw markers
+ * that weren't yet processed.
+ */
+SmartFlashcardsPlugin._applyClozeCls = function(el, cls) {
+  const existing = el.querySelectorAll('.sfc-cloze-reading');
+  if (existing.length > 0) {
+    existing.forEach(s => { const c = s.cloneNode(true); c.className = cls; s.replaceWith(c); });
+  } else {
+    SmartFlashcardsPlugin._applyClozeDOM(el, cls);
+  }
+};
+
 SmartFlashcardsPlugin._applyClozeDOM = function(el, cls) {
   const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
     acceptNode(node) {
