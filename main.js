@@ -388,6 +388,25 @@ class SrsDatabase {
     delete this._data[oldPath];
     await this._save();
   }
+
+  /** Remove keys no longer present in a file. Returns true if anything was deleted. */
+  pruneFile(filePath, validKeys) {
+    const fileMap = this._data[filePath];
+    if (!fileMap) return false;
+    let changed = false;
+    for (const key of Object.keys(fileMap)) {
+      if (!validKeys.has(key)) { delete fileMap[key]; changed = true; }
+    }
+    if (changed && Object.keys(fileMap).length === 0) delete this._data[filePath];
+    return changed;
+  }
+
+  /** Remove all SRS data for a deleted note. Returns true if anything was deleted. */
+  deleteFile(filePath) {
+    if (!this._data[filePath]) return false;
+    delete this._data[filePath];
+    return true;
+  }
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -1076,6 +1095,31 @@ class SmartFlashcardsPlugin extends Plugin {
     // Keep db in sync when notes are renamed
     this.registerEvent(
       this.app.vault.on('rename', (file, oldPath) => this.db.renameFile(oldPath, file.path))
+    );
+
+    // Prune stale card keys when a note is saved
+    this.registerEvent(
+      this.app.vault.on('modify', async (file) => {
+        if (!(file instanceof TFile) || file.extension !== 'md') return;
+        const fileMap = this.db.getFileMap(file.path);
+        if (Object.keys(fileMap).length === 0) return; // no tracked cards → nothing to prune
+        let content;
+        try { content = await this.app.vault.read(file); } catch { return; }
+        const cards = CardParser.parseCards(content);
+        const validKeys = new Set(cards.map(c => c.front));
+        for (const card of cards) {
+          if (card.type === 'bidirectional') validKeys.add(card.front + '__back');
+        }
+        if (this.db.pruneFile(file.path, validKeys)) await this.db._save();
+      })
+    );
+
+    // Remove all SRS data when a note is deleted
+    this.registerEvent(
+      this.app.vault.on('delete', async (file) => {
+        if (!(file instanceof TFile) || file.extension !== 'md') return;
+        if (this.db.deleteFile(file.path)) await this.db._save();
+      })
     );
 
     // Register the sidebar panel view
