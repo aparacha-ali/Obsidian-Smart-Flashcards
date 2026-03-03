@@ -59,6 +59,20 @@ function localDateStr(date) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// UTILITIES
+// ─────────────────────────────────────────────────────────────
+
+/** Fisher-Yates shuffle — returns a new shuffled array */
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+// ─────────────────────────────────────────────────────────────
 // SM-2 ALGORITHM
 // ─────────────────────────────────────────────────────────────
 
@@ -701,7 +715,7 @@ class ReviewModal extends Modal {
     super(app);
     this.plugin = plugin;
     this.storage = plugin.storage;
-    this.queue = queue;
+    this.queue = shuffle(queue);
     this.index = 0;
     this.showingFront = true;
     this.modalEl.addClass('sfc-review-modal');
