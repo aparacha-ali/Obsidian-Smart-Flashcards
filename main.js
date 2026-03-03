@@ -277,6 +277,15 @@ const CardParser = {
    */
   _matchInlineCards(line) {
     const results = [];
+
+    // Build [[wikilink]] spans so brackets inside them are never mistaken for inline cards
+    const wikiSpans = [];
+    const wlRe = /\[\[.*?\]\]/g;
+    let wl;
+    while ((wl = wlRe.exec(line)) !== null) {
+      wikiSpans.push([wl.index, wl.index + wl[0].length]);
+    }
+
     // Single regex covers all four variants; capture groups:
     //  1 = opening bracket char ( or {
     //  2 = front text
@@ -288,6 +297,8 @@ const CardParser = {
       const [, open, front, sep, back, close] = m;
       // Bracket must match: ( with ), { with }
       if ((open === '(' && close !== ')') || (open === '{' && close !== '}')) continue;
+      // Skip if the opening bracket falls inside a [[wikilink]]
+      if (wikiSpans.some(([s, e]) => m.index >= s && m.index < e)) continue;
       const type = sep === ':::' ? 'bidirectional' : 'basic';
       // displayMode: parens = hide answer (show Q), braces = hide question (show A)
       const displayMode = open === '(' ? 'hide-back' : 'hide-front';
