@@ -378,25 +378,30 @@ const CardParser = {
 const SRS_DB_PATH = '.smart-flashcards/srs-data.json';
 
 class SrsDatabase {
-  constructor(app) {
-    this.app = app;
+  constructor(plugin) {
+    this.plugin = plugin;
     this._data = {};  // { [filePath]: { [cardKey]: srsData } }
   }
 
   async load() {
-    const adapter = this.app.vault.adapter;
+    const data = await this.plugin.loadData() || {};
+    if (data.srsDb) {
+      this._data = data.srsDb;
+      return;
+    }
+    // One-time migration from old .smart-flashcards/srs-data.json
+    const adapter = this.plugin.app.vault.adapter;
     try {
       if (await adapter.exists(SRS_DB_PATH)) {
         this._data = JSON.parse(await adapter.read(SRS_DB_PATH));
+        await this._save();
       }
     } catch { this._data = {}; }
   }
 
   async _save() {
-    const adapter = this.app.vault.adapter;
-    const json = JSON.stringify(this._data, null, 2);
-    try { await adapter.mkdir('.smart-flashcards'); } catch { /* already exists */ }
-    await adapter.write(SRS_DB_PATH, json);
+    const current = await this.plugin.loadData() || {};
+    await this.plugin.saveData({ ...current, srsDb: this._data });
   }
 
   getFileMap(filePath) { return this._data[filePath] || {}; }
@@ -1118,7 +1123,7 @@ class SmartFlashcardsSettingTab extends PluginSettingTab {
 class SmartFlashcardsPlugin extends Plugin {
   async onload() {
     await this.loadSettings();
-    this.db = new SrsDatabase(this.app);
+    this.db = new SrsDatabase(this);
     await this.db.load();
     this.storage = new StorageManager(this.app, this);
 
@@ -1259,12 +1264,14 @@ class SmartFlashcardsPlugin extends Plugin {
   }
 
   async loadSettings() {
-    const saved = await this.loadData();
-    this.settings = Object.assign({}, DEFAULT_SETTINGS, saved);
+    const saved = await this.loadData() || {};
+    const { srsDb: _, ...settingsData } = saved;
+    this.settings = Object.assign({}, DEFAULT_SETTINGS, settingsData);
   }
 
   async saveSettings() {
-    await this.saveData(this.settings);
+    const current = await this.loadData() || {};
+    await this.saveData({ ...current, ...this.settings });
   }
 
   /** Update the status bar with due card count */
