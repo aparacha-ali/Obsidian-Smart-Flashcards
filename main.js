@@ -359,22 +359,19 @@ class SrsDatabase {
   }
 
   async load() {
-    const f = this.app.vault.getAbstractFileByPath(SRS_DB_PATH);
-    if (f) {
-      try { this._data = JSON.parse(await this.app.vault.read(f)); } catch { this._data = {}; }
-    }
+    const adapter = this.app.vault.adapter;
+    try {
+      if (await adapter.exists(SRS_DB_PATH)) {
+        this._data = JSON.parse(await adapter.read(SRS_DB_PATH));
+      }
+    } catch { this._data = {}; }
   }
 
   async _save() {
+    const adapter = this.app.vault.adapter;
     const json = JSON.stringify(this._data, null, 2);
-    const f = this.app.vault.getAbstractFileByPath(SRS_DB_PATH);
-    if (f) {
-      await this.app.vault.modify(f, json);
-    } else {
-      const folder = this.app.vault.getAbstractFileByPath('.smart-flashcards');
-      if (!folder) await this.app.vault.createFolder('.smart-flashcards');
-      await this.app.vault.create(SRS_DB_PATH, json);
-    }
+    try { await adapter.mkdir('.smart-flashcards'); } catch { /* already exists */ }
+    await adapter.write(SRS_DB_PATH, json);
   }
 
   getFileMap(filePath) { return this._data[filePath] || {}; }
