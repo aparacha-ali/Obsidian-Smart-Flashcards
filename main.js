@@ -782,7 +782,7 @@ class ReviewModal extends Modal {
     await MarkdownRenderer.render(this.app, text, el, file ? file.path : '', this.plugin);
     el.querySelectorAll('p').forEach(p => { p.style.margin = '0'; });
 
-    // Enable Cmd/Ctrl+hover previews on internal links
+    // Enable Cmd/Ctrl+hover previews and click-to-open on internal links
     const sourcePath = file ? file.path : '';
     el.querySelectorAll('a.internal-link').forEach(linkEl => {
       linkEl.addEventListener('mouseover', (event) => {
@@ -794,6 +794,11 @@ class ReviewModal extends Modal {
           linktext: linkEl.getAttribute('data-href') || linkEl.getAttribute('href'),
           sourcePath,
         });
+      });
+      linkEl.addEventListener('click', (event) => {
+        event.preventDefault();
+        const href = linkEl.getAttribute('data-href') || linkEl.getAttribute('href');
+        if (href) this.app.workspace.openLinkText(href, sourcePath, false);
       });
     });
   }
